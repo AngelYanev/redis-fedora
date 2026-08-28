@@ -68,7 +68,7 @@
 
 Name:              redis
 Version:           8.10.1
-Release:           5%{?dist}
+Release:           6%{?dist}
 Summary:           A persistent key-value database
 
 # License breakdown:
@@ -424,11 +424,18 @@ install -pDm 0644 src/redismodule.h %{buildroot}%{_includedir}/redismodule.h
 mkdir -p %{buildroot}%{_rpmmacrodir}
 install -pDm 0644 macros.redis %{buildroot}%{_rpmmacrodir}/macros.%{name}
 
-# Per-module licence texts, kept out of the core package's %%license set.
-install -pm 0644 modules/redisbloom/src/LICENSE.txt      LICENSE-redisbloom.txt
-install -pm 0644 modules/redisjson/src/LICENSE.txt       LICENSE-redisjson.txt
-install -pm 0644 modules/redisearch/src/LICENSE.txt      LICENSE-redisearch.txt
-install -pm 0644 modules/redistimeseries/src/LICENSE.txt LICENSE-redistimeseries.txt
+# Module licence texts. RedisBloom, RedisJSON and RedisTimeSeries ship
+# byte-identical AGPL-3.0 texts, so one copy covers all three; RediSearch's
+# differs and is shipped separately. The cmp guard makes a future upstream
+# divergence fail the build rather than silently mislabel a licence.
+install -pm 0644 modules/redisbloom/src/LICENSE.txt LICENSE-modules.txt
+for m in redisjson redistimeseries; do
+    cmp -s modules/$m/src/LICENSE.txt LICENSE-modules.txt || {
+        echo "ERROR: $m licence text differs from redisbloom's; ship it separately"
+        exit 1
+    }
+done
+install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 
 
 %post
@@ -473,16 +480,18 @@ install -pm 0644 modules/redistimeseries/src/LICENSE.txt LICENSE-redistimeseries
 %dir %{redis_modules_dir}
 %dir %attr(0750, redis, redis) %{_sharedstatedir}/%{name}
 %dir %attr(0750, root, redis) %{_localstatedir}/log/%{name}
+# Created at boot by %%{_tmpfilesdir}/%%{name}.conf; owned as %%ghost so the
+# package accounts for it without shipping a file on tmpfs.
+%ghost %dir %attr(0755, redis, redis) %{_rundir}/%{name}
 
 %files devel
 %{_includedir}/redismodule.h
 %{_rpmmacrodir}/macros.%{name}
 
 %files -n redis-full
-%license LICENSE-redisbloom.txt
+# One copy per unique licence text; see the cmp guard in %%install.
+%license LICENSE-modules.txt
 %license LICENSE-redisearch.txt
-%license LICENSE-redisjson.txt
-%license LICENSE-redistimeseries.txt
 %{redis_modules_dir}/redisbloom.so
 %{redis_modules_dir}/redisearch.so
 %{redis_modules_dir}/rejson.so
@@ -496,6 +505,12 @@ install -pm 0644 modules/redistimeseries/src/LICENSE.txt LICENSE-redistimeseries
 
 
 %changelog
+* Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-6
+- Own %%{_rundir}/redis as %%ghost; tmpfiles.d created it but no package
+  accounted for it
+- Ship one copy of each unique module licence text instead of four files with
+  three duplicates, guarded by a cmp check against upstream divergence
+
 * Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-5
 - Stop owning directories under %%{_sysconfdir}/systemd/system: that path
   belongs to the local administrator, not to packages

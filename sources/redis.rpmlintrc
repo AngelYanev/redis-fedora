@@ -1,8 +1,56 @@
-# Source0-2 are generated locally, not fetched from a URL:
-#   Source0 by upstream's `make tarball TAG=<ref>` (core + modules at their
-#           modules.yaml-pinned refs)
-#   Source1/2 by `cargo vendor` against each Rust module's workspace
-# There is no upstream URL to point at, so the missing-URL warning is expected.
+# rpmlint configuration.
+#
+# Only findings that are genuinely expected for this package are filtered, and
+# each carries its reason. Anything not listed here should be treated as a real
+# problem to fix, not silenced.
+
+# --- Source0-2 are generated, not fetched ---------------------------------
+# They do not exist as upstream release artefacts: Source0 comes from Redis's
+# own `make tarball`, Source1/2 from `cargo vendor`. See scripts/make-sources.sh.
 addFilter(r"invalid-url Source[012]:")
-# redis-full is a metapackage and deliberately ships no files.
+
+# --- Copr's signing key is not in the local keyring -----------------------
+# Environmental: appears when linting RPMs downloaded from Copr, not a defect.
+addFilter(r"unknown-key")
+
+# --- Dictionary false positives -------------------------------------------
+# Product and API names, not misspellings.
+addFilter(r"spelling-error.*(rejson|redisearch|redisbloom|redisjson|downsampling|loadmodule|conf|toolchain)")
+
+# --- The redis service user -----------------------------------------------
+# Redis runs as its own unprivileged user, created via sysusers.d. The daemon
+# needs to own its state and config, so a non-root uid/gid here is intended.
+addFilter(r"non-standard-(uid|gid) .* redis")
+
+# --- Restrictive permissions on config and state --------------------------
+# redis.conf and sentinel.conf can hold credentials (requirepass, TLS keys),
+# so they are 0640 redis:redis inside 0750 directories rather than world
+# readable. /var/lib/redis and /var/log/redis are 0750 for the same reason.
+# This matches how Fedora has historically shipped redis.
+addFilter(r"non-standard-dir-perm /(etc|var/lib|var/log)/redis")
+addFilter(r"non-readable /etc/redis/(redis|sentinel)\.conf")
+
+# --- Obsoletes without matching Provides ----------------------------------
+# Deliberate. The per-module packages (redisbloom, redisearch, redisjson,
+# redistimeseries) were replaced by the single redis-full package. Adding
+# Provides for the old names would make `dnf install redisbloom` succeed
+# again, which is exactly the per-module install shape this packaging removed.
+# Obsoletes alone migrates existing installs without resurrecting the names.
+addFilter(r"obsolete-not-provided (redisbloom|redisearch|redisjson|redistimeseries)")
+
+# --- Upstream ships no man pages ------------------------------------------
+# Nothing to install; not something packaging can fix.
+addFilter(r"no-manual-page-for-binary redis-")
+
+# --- redis-devel is a header and RPM macros only --------------------------
+addFilter(r"redis-devel.*(no-documentation|only-non-binary-in-usr-lib)")
+
+# --- redis-full ships modules, not documentation --------------------------
+# It contains only the module .so files, their loadmodule stubs and licences.
 addFilter(r"redis-full.*no-documentation")
+
+# --- OpenSSL cipher-list use is upstream C code ---------------------------
+# redis calls SSL_CTX_set_cipher_list directly. Real, but a code issue for
+# upstream rather than something the spec can address; recorded here so it is
+# not mistaken for a packaging fault.
+addFilter(r"crypto-policy-non-compliance-openssl")
