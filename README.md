@@ -50,7 +50,7 @@ Full pipeline: `make all` (sources → srpm → mock → lint).
 ```
 redis.spec              the only file you edit for a version bump
 Makefile                reproducible build + test entry points
-sources/                static sources: systemd units, sysusers, tmpfiles,
+sources/                static sources: systemd units, sysusers,
                         logrotate, the redis.conf patch, rpmlintrc
 scripts/
   make-sources.sh       regenerates the three generated tarballs

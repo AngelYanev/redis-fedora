@@ -68,7 +68,7 @@
 
 Name:              redis
 Version:           8.10.1
-Release:           6%{?dist}
+Release:           7%{?dist}
 Summary:           A persistent key-value database
 
 # License breakdown:
@@ -103,8 +103,7 @@ Source9:           redis.logrotate
 Source10:          redis-sentinel.service
 Source11:          redis.service
 Source12:          redis.sysusers
-Source13:          redis.tmpfiles
-Source14:          %{name}.rpmlintrc
+Source13:          %{name}.rpmlintrc
 
 # Fix default paths in configuration files for the RPM layout, and make
 # redis.conf include /etc/redis/modules/*.conf so installing a module package
@@ -406,7 +405,6 @@ done
 
 # --- core system integration ----------------------------------------------
 install -p -D -m 0644 %{SOURCE12} %{buildroot}%{_sysusersdir}/%{name}.conf
-install -p -D -m 0644 %{SOURCE13} %{buildroot}%{_tmpfilesdir}/%{name}.conf
 install -pDm 0644 %{SOURCE9} %{buildroot}%{_sysconfdir}/logrotate.d/%{name}
 mkdir -p %{buildroot}%{_unitdir}
 install -pm 0644 %{SOURCE11} %{buildroot}%{_unitdir}
@@ -439,7 +437,6 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 
 
 %post
-%tmpfiles_create %{name}.conf
 %systemd_post %{name}.service
 %systemd_post %{name}-sentinel.service
 
@@ -470,7 +467,6 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 %{_unitdir}/%{name}.service
 %{_unitdir}/%{name}-sentinel.service
 %{_sysusersdir}/%{name}.conf
-%{_tmpfilesdir}/%{name}.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %attr(0750, redis, root) %dir %{_sysconfdir}/%{name}
 %attr(0750, redis, root) %dir %{redis_modules_cfg}
@@ -480,9 +476,6 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 %dir %{redis_modules_dir}
 %dir %attr(0750, redis, redis) %{_sharedstatedir}/%{name}
 %dir %attr(0750, root, redis) %{_localstatedir}/log/%{name}
-# Created at boot by %%{_tmpfilesdir}/%%{name}.conf; owned as %%ghost so the
-# package accounts for it without shipping a file on tmpfs.
-%ghost %dir %attr(0755, redis, redis) %{_rundir}/%{name}
 
 %files devel
 %{_includedir}/redismodule.h
@@ -505,6 +498,14 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 
 
 %changelog
+* Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-7
+- Drop redis.tmpfiles and its scriptlet. Both units already create their
+  runtime directory via RuntimeDirectory=, so the tmpfiles.d entry was
+  redundant for the systemd path and disagreed with the unit on mode
+  (0755 vs 2755). redis-sentinel has always relied on RuntimeDirectory=
+  alone, with no tmpfiles entry, which shows the entry was not load-bearing.
+  This also removes the %%ghost that existed only to account for it.
+
 * Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-6
 - Own %%{_rundir}/redis as %%ghost; tmpfiles.d created it but no package
   accounted for it

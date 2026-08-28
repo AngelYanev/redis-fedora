@@ -13,7 +13,7 @@ Verify with `make check-tools`.
 
 ## The sources
 
-`redis.spec` has fifteen Sources. They come from three different places, and
+`redis.spec` has fourteen Sources. They come from three different places, and
 the distinction matters:
 
 ### Source0-2 — generated, not downloadable
@@ -48,9 +48,9 @@ cpu_features, eve, robin-map, fmt, spdlog, tomlplusplus
 make download
 ```
 
-### Source9-14 — static files in `sources/`
+### Source9-13 — static files in `sources/`
 
-systemd units, sysusers, tmpfiles, logrotate, rpmlintrc.
+systemd units, sysusers, logrotate, rpmlintrc.
 
 ## Build steps
 
