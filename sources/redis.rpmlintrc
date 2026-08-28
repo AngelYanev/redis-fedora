@@ -1,0 +1,8 @@
+# Source0-2 are generated locally, not fetched from a URL:
+#   Source0 by upstream's `make tarball TAG=<ref>` (core + modules at their
+#           modules.yaml-pinned refs)
+#   Source1/2 by `cargo vendor` against each Rust module's workspace
+# There is no upstream URL to point at, so the missing-URL warning is expected.
+addFilter(r"invalid-url Source[012]:")
+# redis-full is a metapackage and deliberately ships no files.
+addFilter(r"redis-full.*no-documentation")

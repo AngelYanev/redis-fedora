@@ -1,0 +1,86 @@
+diff --git a/redis.conf b/redis.conf
+index 30a3d8b57..edfd8bdb6 100644
+--- a/redis.conf
++++ b/redis.conf
+@@ -43,6 +43,8 @@
+ # include /path/to/other.conf
+ # include /path/to/fragments/*.conf
+ #
++# Module configuration files
++include /etc/redis/modules/*.conf
+ 
+ ################################## MODULES #####################################
+ 
+@@ -342,7 +344,7 @@ daemonize no
+ # The default is "no". To run under upstart/systemd, you can simply uncomment
+ # the line below:
+ #
+-# supervised auto
++supervised auto
+ 
+ # If a pid file is specified, Redis writes it where specified at startup
+ # and removes it at exit.
+@@ -356,7 +358,7 @@ daemonize no
+ #
+ # Note that on modern Linux systems "/run/redis.pid" is more conforming
+ # and should be used instead.
+-pidfile /var/run/redis_6379.pid
++# pidfile /var/run/redis_6379.pid
+ 
+ # Specify the server verbosity level.
+ # This can be one of:
+@@ -370,7 +372,7 @@ loglevel notice
+ # Specify the log file name. Also the empty string can be used to force
+ # Redis to log on the standard output. Note that if you use standard
+ # output for logging but daemonize, logs will be sent to /dev/null
+-logfile ""
++logfile /var/log/redis/redis-server.log
+ 
+ # To enable logging to the system logger, just set 'syslog-enabled' to yes,
+ # and optionally update the other syslog parameters to suit your needs.
+@@ -530,7 +532,7 @@ rdb-del-sync-files no
+ # The Append Only File will also be created inside this directory.
+ #
+ # Note that you must specify a directory here, not a file name.
+-dir ./
++dir /var/lib/redis
+ 
+ ################################# REPLICATION #################################
+ 
+diff --git a/sentinel.conf b/sentinel.conf
+index c7ce1cba7..fa9263624 100644
+--- a/sentinel.conf
++++ b/sentinel.conf
+@@ -12,7 +12,7 @@ port 26379
+ # By default Redis Sentinel does not run as a daemon. Use 'yes' if you need it.
+ # Note that Redis will write a pid file in /var/run/redis-sentinel.pid when
+ # daemonized.
+-daemonize no
++daemonize yes
+ 
+ # When running daemonized, Redis Sentinel writes a pid file in
+ # /var/run/redis-sentinel.pid by default. You can specify a custom pid file
+@@ -31,7 +31,7 @@ loglevel notice
+ # Specify the log file name. Also the empty string can be used to force
+ # Sentinel to log on the standard output. Note that if you use standard
+ # output for logging but daemonize, logs will be sent to /dev/null
+-logfile ""
++logfile /var/log/redis/redis-sentinel.log
+ 
+ # To enable logging to the system logger, just set 'syslog-enabled' to yes,
+ # and optionally update the other syslog parameters to suit your needs.
+@@ -70,7 +70,7 @@ logfile ""
+ # For Redis Sentinel to chdir to /tmp at startup is the simplest thing
+ # for the process to don't interfere with administrative tasks such as
+ # unmounting filesystems.
+-dir /tmp
++dir /var/lib/redis
+ 
+ # sentinel monitor <master-name> <ip> <redis-port> <quorum>
+ #
+@@ -359,3 +359,5 @@ SENTINEL announce-hostnames no
+ # over.
+ 
+ SENTINEL master-reboot-down-after-period mymaster 0
++
++supervised auto
