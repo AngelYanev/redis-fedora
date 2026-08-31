@@ -45,9 +45,17 @@ addFilter(r"no-manual-page-for-binary redis-")
 # --- redis-devel is a header and RPM macros only --------------------------
 addFilter(r"redis-devel.*(no-documentation|only-non-binary-in-usr-lib)")
 
-# --- redis-full ships modules, not documentation --------------------------
-# It contains only the module .so files, their loadmodule stubs and licences.
-addFilter(r"redis-full.*no-documentation")
+# --- the redis package ships modules, not documentation -------------------
+# It contains only the module .so files, their loadmodule stubs and licences;
+# the server's docs are in redis-server.
+addFilter(r"^redis\.[a-z0-9_]+: W: no-documentation")
+
+# --- logrotate file name ---------------------------------------------------
+# /etc/logrotate.d/redis lives in redis-server but is named for the service
+# and its log directory (/var/log/redis), both still "redis". Renaming it to
+# match the subpackage would orphan admin edits to a %config(noreplace) file
+# on upgrade, for no functional gain.
+addFilter(r"incoherent-logrotate-file /etc/logrotate.d/redis")
 
 # --- OpenSSL cipher-list use is upstream C code ---------------------------
 # redis calls SSL_CTX_set_cipher_list directly. Real, but a code issue for

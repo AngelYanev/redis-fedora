@@ -69,8 +69,8 @@
 
 Name:              redis
 Version:           8.10.1
-Release:           8%{?dist}
-Summary:           Redis with all bundled modules
+Release:           9%{?dist}
+Summary:           Persistent key-value database with all bundled modules
 
 # Aggregate of the server and every bundled module, since this package pulls in
 # both. The narrower core-only expression, with its per-dependency breakdown,
@@ -188,10 +188,10 @@ and RedisTimeSeries. Installing this package pulls in the server and drops a
 loadmodule stub for each module into %{redis_modules_cfg}, which redis.conf
 includes -- so the modules are live as soon as Redis starts.
 
-  RediSearch %{search_ver}       full-text search, vector similarity, secondary indexing
-  RedisJSON %{json_ver}        native JSON data type with JSONPath
-  RedisBloom %{bloom_ver}       Bloom/cuckoo filters, count-min sketch, top-k, t-digest
-  RedisTimeSeries %{timeseries_ver}  time series with downsampling and compaction
+  RediSearch %{search_ver}      full-text search, vector similarity, indexing
+  RedisJSON %{json_ver}       JSON data type with JSONPath queries
+  RedisBloom %{bloom_ver}      Bloom/cuckoo filters, count-min sketch, top-k
+  RedisTimeSeries %{timeseries_ver} time series with downsampling and compaction
 
 For a server with no modules, install redis-server instead. There is no
 partial state: either no modules, or all of them.
@@ -517,6 +517,11 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 
 
 %changelog
+* Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-9
+- Keep %%description lines inside 80 columns; the version macros pushed two of
+  them over once expanded, which only shows on the built RPM
+- Reword the summary so it does not repeat the package name
+
 * Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-8
 - Swap the package names: `redis` is now the server plus every bundled
   module, and `redis-server` is the plain server. Previously `redis` was the
