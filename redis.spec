@@ -68,8 +68,8 @@
 
 Name:              redis
 Version:           8.10.1
-Release:           7%{?dist}
-Summary:           A persistent key-value database
+Release:           8%{?dist}
+Summary:           Redis with all bundled modules
 
 # License breakdown:
 # - redis core: AGPL-3.0-only (tri-licensed RSALv2/SSPLv1/AGPLv3, using AGPLv3)
@@ -79,7 +79,9 @@ Summary:           A persistent key-value database
 # - deps/fpconv: BSL-1.0
 # - deps/hdr_histogram: CC0-1.0 OR BSD-2-Clause
 # - deps/xxhash, deps/fast_float: BSD-2-Clause / MIT
-License:           AGPL-3.0-only AND BSD-3-Clause AND BSD-2-Clause AND MIT AND BSL-1.0
+# Aggregate of the server and every bundled module. The narrower core-only
+# expression is on the redis-server subpackage.
+License:           AGPL-3.0-only AND BSD-3-Clause AND BSD-2-Clause AND MIT AND BSL-1.0 AND Apache-2.0 AND ISC AND Zlib AND 0BSD AND Unicode-DFS-2016 AND Unlicense AND MPL-2.0 AND (Apache-2.0 WITH LLVM-exception)
 URL:               https://redis.io
 
 # Source0-2 have no upstream URL: they do not exist as release artefacts.
@@ -142,56 +144,19 @@ BuildRequires:     procps-ng
 BuildRequires:     tcl8
 %endif
 
-Requires:          logrotate
+# The main package is the modules; the server it loads them into lives in the
+# redis-server subpackage. So `dnf install redis` gives a server with every
+# module, and `dnf install redis-server` gives a plain one.
+Requires:          redis-server%{?_isa} = %{version}-%{release}
 
-Provides:          redis(modules_abi)%{?_isa} = %{redis_modules_abi}
-
-Provides:          bundled(jemalloc) = 5.3.0
-Provides:          bundled(hiredis) = 1.2.0
-Provides:          bundled(lua-libs) = 5.1.5
-Provides:          bundled(linenoise) = 1.0
-Provides:          bundled(lzf)
-Provides:          bundled(hdr_histogram) = 0.11.0
-Provides:          bundled(fast_float) = 6.1.4
-Provides:          bundled(xxhash) = 0.8.3
-Provides:          bundled(fpconv)
-
-# The companion shared libraries RediSearch ships are private to it: do not
-# require them from outside, and do not advertise them as system libraries.
-%global __requires_exclude ^lib(VectorSimilarity|VectorSimilaritySpaces|VectorSimilaritySpaces_no_optimization|cpu_features|hiredis|hiredis_ssl|fmt|spdlog)\\.so
-%global __provides_exclude_from ^%{redis_modules_dir}/.*$
-
-# The module build scripts only map x86_64 and aarch64.
-ExclusiveArch:     x86_64 aarch64
-
-%description
-Redis is an advanced key-value store. It is often referred to as a data
-structure server since keys can contain strings, hashes, lists, sets and
-sorted sets. Vector sets are compiled into the server.
-
-This package is the plain server with no modules loaded. Install redis-full
-to add RediSearch, RedisJSON, RedisBloom and RedisTimeSeries; both are built
-from this same source, so they can never drift apart.
-
-
-%package           devel
-Summary:           Development header for Redis module development
-Provides:          %{name}-static = %{version}-%{release}
-Requires:          %{name}%{?_isa} = %{version}-%{release}
-
-%description       devel
-Header and RPM macros for building modules against this Redis.
-
-
-%package -n        redis-full
-Summary:           Redis modules: RediSearch, RedisJSON, RedisBloom and RedisTimeSeries
-# Union of the four module licences and their vendored dependencies.
-License:           AGPL-3.0-only AND MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND Zlib AND 0BSD AND BSL-1.0 AND Unicode-DFS-2016 AND Unlicense AND MPL-2.0 AND (Apache-2.0 WITH LLVM-exception)
-Requires:          %{name}%{?_isa} = %{version}-%{release}
+# Renamed from redis-full in 8.10.1-8, when `redis` came to mean the full
+# stack. Provides keeps existing `dnf install redis-full` automation working.
+Provides:          redis-full = %{version}-%{release}
+Obsoletes:         redis-full < 8.10.1-8
 
 # The modules were briefly shipped as one package each (8.10.1-3). Obsolete
-# those so an upgrade replaces them with this single package rather than
-# leaving orphans behind whose loadmodule stubs point at deleted .so files.
+# those so an upgrade replaces them rather than leaving orphans behind whose
+# loadmodule stubs point at deleted .so files.
 Obsoletes:         redisbloom < 8.10.1-4
 Obsoletes:         redisearch < 8.10.1-4
 Obsoletes:         redisjson < 8.10.1-4
@@ -215,21 +180,78 @@ Provides:          bundled(fmt) = %{fmt_ver}
 Provides:          bundled(spdlog) = %{spdlog_ver}
 Provides:          bundled(tomlplusplus) = %{toml_ver}
 
-%description -n    redis-full
-Every module bundled by upstream Redis, shipped as one package:
+# The companion shared libraries RediSearch ships are private to it: do not
+# require them from outside, and do not advertise them as system libraries.
+%global __requires_exclude ^lib(VectorSimilarity|VectorSimilaritySpaces|VectorSimilaritySpaces_no_optimization|cpu_features|hiredis|hiredis_ssl|fmt|spdlog)\\.so
+%global __provides_exclude_from ^%{redis_modules_dir}/.*$
 
-  RediSearch %{search_ver}      full-text search, vector similarity, secondary indexing
-  RedisJSON %{json_ver}       native JSON data type with JSONPath
-  RedisBloom %{bloom_ver}      Bloom/cuckoo filters, count-min sketch, top-k, t-digest
-  RedisTimeSeries %{timeseries_ver} time series with downsampling and compaction
+# The module build scripts only map x86_64 and aarch64.
+ExclusiveArch:     x86_64 aarch64
 
-Installing this package drops a loadmodule stub for each module into
-%{redis_modules_cfg}, which redis.conf includes -- so the modules are active
-as soon as Redis restarts. Either install redis on its own for a plain server,
-or install redis-full to get all modules; there is no partial state.
+%description
+Redis with every module upstream bundles: RediSearch, RedisJSON, RedisBloom
+and RedisTimeSeries. Installing this package pulls in the server and drops a
+loadmodule stub for each module into %{redis_modules_cfg}, which redis.conf
+includes -- so the modules are live as soon as Redis starts.
 
-Vector sets are not here: upstream compiles them into redis-server itself, so
-the redis package already provides them.
+  RediSearch %{search_ver}       full-text search, vector similarity, secondary indexing
+  RedisJSON %{json_ver}        native JSON data type with JSONPath
+  RedisBloom %{bloom_ver}       Bloom/cuckoo filters, count-min sketch, top-k, t-digest
+  RedisTimeSeries %{timeseries_ver}  time series with downsampling and compaction
+
+For a server with no modules, install redis-server instead. There is no
+partial state: either no modules, or all of them.
+
+Vector sets are not listed above because they are not a module -- upstream
+compiles them into the server, so redis-server already provides them.
+
+
+%package -n        redis-server
+Summary:           A persistent key-value database
+# Core only. The full-stack licence, covering the modules, is on the main
+# redis package.
+# - redis core: AGPL-3.0-only (tri-licensed RSALv2/SSPLv1/AGPLv3, using AGPLv3)
+# - deps/hiredis: BSD-3-Clause
+# - deps/jemalloc, deps/linenoise, src/lzf*: BSD-2-Clause
+# - deps/lua: MIT
+# - deps/fpconv: BSL-1.0
+# - deps/hdr_histogram: CC0-1.0 OR BSD-2-Clause
+# - deps/xxhash, deps/fast_float: BSD-2-Clause / MIT
+License:           AGPL-3.0-only AND BSD-3-Clause AND BSD-2-Clause AND MIT AND BSL-1.0
+Requires:          logrotate
+
+Provides:          redis(modules_abi)%{?_isa} = %{redis_modules_abi}
+
+Provides:          bundled(jemalloc) = 5.3.0
+Provides:          bundled(hiredis) = 1.2.0
+Provides:          bundled(lua-libs) = 5.1.5
+Provides:          bundled(linenoise) = 1.0
+Provides:          bundled(lzf)
+Provides:          bundled(hdr_histogram) = 0.11.0
+Provides:          bundled(fast_float) = 6.1.4
+Provides:          bundled(xxhash) = 0.8.3
+Provides:          bundled(fpconv)
+
+%description -n    redis-server
+Redis is an advanced key-value store. It is often referred to as a data
+structure server since keys can contain strings, hashes, lists, sets and
+sorted sets.
+
+This is the plain server, with no modules loaded. Vector sets are compiled
+into it. Install the redis package to add RediSearch, RedisJSON, RedisBloom
+and RedisTimeSeries; both are built from this same source, so they can never
+drift apart.
+
+
+%package           devel
+Summary:           Development header for Redis module development
+Provides:          redis-static = %{version}-%{release}
+Requires:          redis-server%{?_isa} = %{version}-%{release}
+
+%description       devel
+Header and RPM macros for building modules against this Redis.
+
+
 
 %prep
 %autosetup -n redis-%{version} -p1
@@ -436,20 +458,37 @@ done
 install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 
 
-%post
+# Scriptlets belong to redis-server: it owns the units and the service user.
+%post -n redis-server
 %systemd_post %{name}.service
 %systemd_post %{name}-sentinel.service
 
-%preun
+%preun -n redis-server
 %systemd_preun %{name}.service
 %systemd_preun %{name}-sentinel.service
 
-%postun
+%postun -n redis-server
 %systemd_postun_with_restart %{name}.service
 %systemd_postun_with_restart %{name}-sentinel.service
 
 
+# The main package: the modules themselves.
 %files
+# One copy per unique licence text; see the cmp guard in %%install.
+%license LICENSE-modules.txt
+%license LICENSE-redisearch.txt
+%{redis_modules_dir}/redisbloom.so
+%{redis_modules_dir}/redisearch.so
+%{redis_modules_dir}/rejson.so
+%{redis_modules_dir}/redistimeseries.so
+%{redis_modules_dir}/lib*.so*
+%config(noreplace) %{redis_modules_cfg}/redisbloom.conf
+%config(noreplace) %{redis_modules_cfg}/search.conf
+%config(noreplace) %{redis_modules_cfg}/redisjson.conf
+%config(noreplace) %{redis_modules_cfg}/timeseries.conf
+
+# The server, and the directories the modules drop into.
+%files -n redis-server
 %license LICENSE.txt
 %license COPYING-jemalloc
 %license COPYRIGHT-lua
@@ -481,23 +520,17 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 %{_includedir}/redismodule.h
 %{_rpmmacrodir}/macros.%{name}
 
-%files -n redis-full
-# One copy per unique licence text; see the cmp guard in %%install.
-%license LICENSE-modules.txt
-%license LICENSE-redisearch.txt
-%{redis_modules_dir}/redisbloom.so
-%{redis_modules_dir}/redisearch.so
-%{redis_modules_dir}/rejson.so
-%{redis_modules_dir}/redistimeseries.so
-%{redis_modules_dir}/lib*.so*
-%config(noreplace) %{redis_modules_cfg}/redisbloom.conf
-%config(noreplace) %{redis_modules_cfg}/search.conf
-%config(noreplace) %{redis_modules_cfg}/redisjson.conf
-%config(noreplace) %{redis_modules_cfg}/timeseries.conf
-
 
 
 %changelog
+* Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-8
+- Swap the package names: `redis` is now the server plus every bundled
+  module, and `redis-server` is the plain server. Previously `redis` was the
+  plain server and `redis-full` carried the modules.
+- redis-full is obsoleted by, and provided by, redis so existing automation
+  keeps working
+- redis-devel now depends on redis-server rather than the full stack
+
 * Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-7
 - Drop redis.tmpfiles and its scriptlet. Both units already create their
   runtime directory via RuntimeDirectory=, so the tmpfiles.d entry was

@@ -5,14 +5,14 @@ source, and ships two things you can install:
 
 | Package | What you get |
 |---|---|
-| `redis` | Plain server: `redis-server`, `redis-cli`, `redis-sentinel`. Vector sets included (compiled into the binary). No modules. |
-| `redis-full` | The same server plus **RediSearch, RedisJSON, RedisBloom and RedisTimeSeries**, active on restart. |
+| `redis-server` | Plain server: `redis-server`, `redis-cli`, `redis-sentinel`. Vector sets included (compiled into the binary). No modules. |
+| `redis` | The same server plus **RediSearch, RedisJSON, RedisBloom and RedisTimeSeries**, active on restart. |
 
 ```bash
 sudo dnf copr enable @redis/redis
-sudo dnf install redis          # plain
+sudo dnf install redis-server   # plain
 # or
-sudo dnf install redis-full     # everything
+sudo dnf install redis          # everything
 sudo systemctl enable --now redis
 ```
 

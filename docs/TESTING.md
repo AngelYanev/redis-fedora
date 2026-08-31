@@ -33,7 +33,7 @@ if any assertion fails.
 
 ## What it asserts
 
-### 1. `dnf install redis` — plain server
+### 1. `dnf install redis-server` — plain server
 
 | Check | Expected |
 |---|---|
@@ -53,7 +53,7 @@ were still published, they carried `Supplements: redis`, so `dnf install redis`
 silently dragged in four unwanted module packages. Only a runtime check
 catches that.
 
-### 2. `dnf install redis-full` — server with every module
+### 2. `dnf install redis` — server with every module
 
 | Module | Commands exercised |
 |---|---|
@@ -88,7 +88,7 @@ Be clear about the gaps:
 
 ```bash
 sudo dnf copr enable @redis/redis
-sudo dnf install redis-full
+sudo dnf install redis
 sudo systemctl enable --now redis
 redis-cli MODULE LIST
 ```

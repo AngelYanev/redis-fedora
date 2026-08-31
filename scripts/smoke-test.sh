@@ -5,10 +5,10 @@
 # This deliberately tests both supported install shapes, because "the RPM
 # built" and "the module loads" are different claims:
 #
-#   redis        plain server. Only vector sets (compiled into redis-server).
-#                Every module command must be REJECTED -- that is what proves
-#                a plain install really is plain.
-#   redis-full   server plus all four modules, all commands working.
+#   redis-server  plain server. Only vector sets (compiled into the binary).
+#                 Every module command must be REJECTED -- that is what proves
+#                 a plain install really is plain.
+#   redis         the server plus all four modules, all commands working.
 #
 # Usage:
 #   scripts/smoke-test.sh copr [<chroot>]    install from the Copr repo
@@ -110,9 +110,9 @@ stop_server() { $CLI SHUTDOWN NOSAVE >/dev/null 2>&1; sleep 1; }
 
 # ---------------------------------------------------------------------------
 echo
-echo "=== 1/2  dnf install redis  (plain server) ==="
+echo "=== 1/2  dnf install redis-server  (plain server) ==="
 ROOT="$ROOT_BASE/plain"
-install_root redis "$ROOT" || { echo "install failed"; exit 1; }
+install_root redis-server "$ROOT" || { echo "install failed"; exit 1; }
 echo "  installed: $(sudo rpm --root="$ROOT" -qa 2>/dev/null | grep -cE '^redis') redis package(s)"
 sudo rpm --root="$ROOT" -qa 2>/dev/null | grep -E '^redis' | sort | sed 's/^/    /'
 if start_server "$ROOT"; then
@@ -129,9 +129,9 @@ sudo rm -rf "$ROOT"
 
 # ---------------------------------------------------------------------------
 echo
-echo "=== 2/2  dnf install redis-full  (server + all modules) ==="
+echo "=== 2/2  dnf install redis  (server + all modules) ==="
 ROOT="$ROOT_BASE/full"
-install_root redis-full "$ROOT" || { echo "install failed"; exit 1; }
+install_root redis "$ROOT" || { echo "install failed"; exit 1; }
 sudo rpm --root="$ROOT" -qa 2>/dev/null | grep -E '^redis' | sort | sed 's/^/    /'
 if start_server "$ROOT"; then
     echo "  modules: $($CLI MODULE LIST 2>/dev/null | paste - - - - - - - - 2>/dev/null | awk '{printf "%s ", $2}')"

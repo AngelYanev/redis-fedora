@@ -64,19 +64,27 @@ individually removable.
 
 Subpackages were initially one per module (`redisbloom`, `redisearch`,
 `redisjson`, `redistimeseries`). That was collapsed: the modules now ship as
-a single `redis-full` package, because the requirement is to install either a
-plain server or a server with everything — not to hand-pick modules.
+a single package, because the requirement is to install either a plain
+server or a server with everything — not to hand-pick modules.
 
 ```
 redis.spec
-  |-- redis          server, cli, sentinel, vector sets
+  |-- redis-server   server, cli, sentinel, vector sets
   |-- redis-devel    redismodule.h + RPM macros
-  `-- redis-full     all four modules + their loadmodule stubs
+  `-- redis          the modules + their loadmodule stubs; requires redis-server
 ```
 
-`redis-full` carries `Obsoletes:` for the short-lived per-module packages
-(8.10.1-3), so upgrading replaces them instead of leaving orphans whose
+`redis` carries `Obsoletes:` for the short-lived per-module packages
+(8.10.1-3) and for `redis-full`, the name the module package used before the
+8.10.1-8 swap. Upgrading replaces them instead of leaving orphans whose
 `loadmodule` stubs point at deleted `.so` files.
+
+### Why `redis` is the full stack
+
+`dnf install redis` gives the behaviour most people expect from "install
+Redis" — a working server with the modules upstream ships. Someone who wants
+a bare server asks for `redis-server` explicitly. Before 8.10.1-8 this was
+reversed: `redis` was plain and `redis-full` added modules.
 
 ## How modules activate
 
@@ -86,7 +94,7 @@ redis.spec
 include /etc/redis/modules/*.conf
 ```
 
-`redis-full` drops a stub per module into that directory:
+`redis` drops a stub per module into that directory:
 
 ```
 /etc/redis/modules/redisbloom.conf   -> loadmodule /usr/lib64/redis/modules/redisbloom.so
@@ -96,15 +104,15 @@ include /etc/redis/modules/*.conf
 ```
 
 So installing the package is what enables the modules — no config editing.
-A plain `redis` install leaves that directory empty and the glob matches
-nothing, which Redis handles fine (verified).
+A plain `redis-server` install leaves that directory empty and the glob
+matches nothing, which Redis handles fine (verified).
 
 ## Vector sets are not a module
 
 Upstream compiles them into the server binary — `src/Makefile` builds
 `hnsw.o`, `vset.o` and `vset_config.o` under `-DINCLUDE_VEC_SETS=1`. They
 appear in `MODULE LIST` as `vectorset` with no package providing them, and
-`VADD`/`VSIM` work on a plain `redis` install. Nothing to package.
+`VADD`/`VSIM` work on a plain `redis-server` install. Nothing to package.
 
 ## The cost of this design
 
@@ -116,7 +124,7 @@ Being honest about the trade-off:
   is not theoretical: during development, core and RedisBloom built fine while
   RedisJSON and RedisTimeSeries failed, and the whole build produced zero
   packages.
-- **Version inflation.** `redis-full` carries the core version (8.10.1) even
+- **Version inflation.** `redis` carries the core version (8.10.1) even
   though RediSearch upstream is 8.10.0. Actual upstream refs are recorded in
   the `%global *_ver` macros and stated in the package description.
 

@@ -57,8 +57,10 @@ Release:        1%{?dist}
 Add a `%changelog` entry. Do not write bare `%{version}` in changelog text —
 rpmlint flags `macro-in-%changelog`; escape as `%%{version}`.
 
-If `redis-full`'s `Obsoletes:` bounds are still `< 8.10.1-4`, leave them; they
-only matter for upgrades from the short-lived per-module packages.
+Leave the `Obsoletes:` bounds on the `redis` package alone; they only matter
+for upgrades from the short-lived per-module packages (`< 8.10.1-4`) and from
+`redis-full` (`< 8.10.1-8`), which is what the module package was called
+before `redis` took that role.
 
 ### 4. Regenerate sources and build
 

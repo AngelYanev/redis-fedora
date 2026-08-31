@@ -11,9 +11,9 @@ from a single source, producing three packages:
 
 | Package | Contents |
 |---|---|
-| `redis` | plain server; vector sets compiled in; **no modules** |
+| `redis-server` | plain server; vector sets compiled in; **no modules** |
 | `redis-devel` | `redismodule.h` + RPM macros |
-| `redis-full` | all four modules (RediSearch, RedisJSON, RedisBloom, RedisTimeSeries) |
+| `redis` | the server plus all four modules (RediSearch, RedisJSON, RedisBloom, RedisTimeSeries) |
 
 It replaced five separate packaging repos. Do not reintroduce per-module
 packages without reading `docs/DESIGN.md` — the split caused unsatisfiable
@@ -103,10 +103,10 @@ it. Removing those `touch` lines breaks the offline build.
 
 ### 7. Do not declare `%dir` for redis-owned directories
 
-`redis` owns `/etc/redis/modules` (`0750 redis:root`) and
+`redis-server` owns `/etc/redis/modules` (`0750 redis:root`) and
 `/usr/lib64/redis/modules`. A subpackage re-declaring them with different
-permissions produces a **file conflict that blocks installation**. Module
-packages place files only.
+permissions produces a **file conflict that blocks installation**. The `redis`
+package places files into them and owns no directories.
 
 ### 8. Companion libraries are scattered
 
@@ -152,7 +152,7 @@ make copr          # then check ALL chroots, not just overall status
 make smoke         # runtime assertions
 ```
 
-`make smoke` asserts that a plain `redis` install **rejects** `JSON.SET`,
+`make smoke` asserts that a plain `redis-server` install **rejects** `JSON.SET`,
 `BF.ADD`, `TS.ADD` and `FT.CREATE`. Those rejections are the test passing, not
 failing — they prove nothing leaked in through a weak dependency. That bug was
 real: old per-module RPMs carried `Supplements: redis`, so `dnf install redis`
