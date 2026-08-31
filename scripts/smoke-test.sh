@@ -10,6 +10,9 @@
 #                 a plain install really is plain.
 #   redis         the server plus all four modules, all commands working.
 #
+# A third section starts from the packaged /etc/redis/redis.conf, which the
+# first two do not use -- see start_shipped() for why that matters.
+#
 # Usage:
 #   scripts/smoke-test.sh copr [<chroot>]    install from the Copr repo
 #   scripts/smoke-test.sh local <dir>        install from a local rpm dir
@@ -108,6 +111,34 @@ EOF
 
 stop_server() { $CLI SHUTDOWN NOSAVE >/dev/null 2>&1; sleep 1; }
 
+# start_shipped <root> -- start using the packaged /etc/redis/redis.conf,
+# overriding only port and logfile on the command line.
+#
+# This exists because two real bugs escaped the sections above, which use a
+# minimal config of our own making:
+#   * redis.conf shipped an auto-managed loadmodule block with development-tree
+#     paths (./modules/<name>/<lib>.so). Redis aborts when a loadmodule target
+#     is missing, so a plain server would not start at all.
+#   * /var/log/redis was root:redis 0750, leaving the redis user without a
+#     write bit, so the daemon could not create its own log file.
+# Anything that only manifests through the packaged config needs this test.
+start_shipped() {
+    local root="$1"
+    mkdir -p "$LOGDIR"
+    LOG="$LOGDIR/$(basename "$root")-shipped.log"
+    sudo chroot "$root" /usr/bin/env LC_ALL=C LANG=C /usr/bin/redis-server \
+        /etc/redis/redis.conf --port "$PORT" --logfile "" --daemonize no \
+        --ignore-warnings ARM64-COW-BUG >"$LOG" 2>&1 &
+    CLI="sudo chroot $root /usr/bin/redis-cli -p $PORT"
+    for _ in $(seq 30); do
+        [ "$($CLI PING 2>/dev/null)" = "PONG" ] && return 0
+        sleep 1
+    done
+    echo "    server did not come up with the shipped config; log:"
+    tail -8 "$LOG" 2>/dev/null | sed 's/^/      /'
+    return 1
+}
+
 # ---------------------------------------------------------------------------
 echo
 echo "=== 1/2  dnf install redis-server  (plain server) ==="
@@ -148,6 +179,36 @@ if start_server "$ROOT"; then
     $CLI HSET item:1 title "fedora rpm packaging" price 10 >/dev/null 2>&1
     sleep 1
     assert_reply "RediSearch FT.SEARCH" "item:1" FT.SEARCH idx fedora
+    stop_server
+else FAILED=$((FAILED+1)); fi
+sudo rm -rf "$ROOT"
+
+# ---------------------------------------------------------------------------
+echo
+echo "=== 3/3  the packaged /etc/redis/redis.conf actually works ==="
+ROOT="$ROOT_BASE/shipped"
+install_root redis-server "$ROOT" || { echo "install failed"; exit 1; }
+
+# Static check: the daemon runs as redis and must be able to create its log.
+logdir_owner=$(sudo stat -c '%U' "$ROOT/var/log/redis" 2>/dev/null)
+if [ "$logdir_owner" = "redis" ]; then
+    ok "/var/log/redis writable by the redis user (owner: $logdir_owner)"
+else
+    bad "/var/log/redis owned by '$logdir_owner', not redis -- the daemon cannot create its log file"
+fi
+
+# No loadmodule line may survive in the packaged config: redis-server aborts
+# if any of them points at a path that is not installed.
+stray=$(sudo grep -c '^loadmodule' "$ROOT/etc/redis/redis.conf" 2>/dev/null || echo 0)
+if [ "$stray" = "0" ]; then
+    ok "no stray loadmodule lines in the packaged redis.conf"
+else
+    bad "$stray loadmodule line(s) left in redis.conf; a plain server will abort at startup"
+    sudo grep -n '^loadmodule' "$ROOT/etc/redis/redis.conf" | sed 's/^/        /'
+fi
+
+if start_shipped "$ROOT"; then
+    assert_cmd "starts from the packaged config" "PONG" PING
     stop_server
 else FAILED=$((FAILED+1)); fi
 sudo rm -rf "$ROOT"

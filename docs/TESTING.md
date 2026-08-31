@@ -70,12 +70,33 @@ RediSearch indexes a document and searches for it, rather than just creating
 an index, because index creation succeeds even when the module cannot actually
 index.
 
+### 3. The packaged `/etc/redis/redis.conf` actually works
+
+The first two sections start the server with a minimal config written by the
+test. That is a blind spot, and it hid two real bugs that only appeared when
+the package was installed on a live machine and started via systemd:
+
+- `redis.conf` shipped an auto-managed `loadmodule` block with
+  development-tree paths (`./modules/<name>/<lib>.so`), written by upstream's
+  `make modules-update` and captured by `make tarball`. Redis **aborts** when
+  a `loadmodule` target is missing, so a plain server would not start at all.
+- `/var/log/redis` was `root:redis 0750`, leaving the `redis` user without a
+  write bit, so the daemon could not create its own log file.
+
+This section therefore starts from the packaged config, overriding only port
+and logfile, and statically asserts that the log directory is owned by `redis`
+and that no `loadmodule` line survives in `redis.conf`.
+
 ## What it does not cover
 
 Be clear about the gaps:
 
-- **No persistence testing.** RDB/AOF round-trips, and module data surviving a
-  restart, are not exercised.
+- **No persistence testing.** RDB/AOF round-trips are not exercised by the
+  script. Note that removing the `redis` package while module data exists on
+  disk leaves the server unable to start -- Redis refuses an RDB containing
+  module data with no matching module (`no matching module 'ft_index0'`).
+  That is Redis behaviour, not a packaging fault, but it is worth knowing
+  before removing modules from a live instance.
 - **No cluster or sentinel testing.** Sentinel ships but is untested here.
 - **No upgrade testing.** Going from an older installed version to this one,
   and what happens to `%config(noreplace)` files, is not covered.

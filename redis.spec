@@ -69,7 +69,7 @@
 
 Name:              redis
 Version:           8.10.1
-Release:           9%{?dist}
+Release:           10%{?dist}
 Summary:           Persistent key-value database with all bundled modules
 
 # Aggregate of the server and every bundled module, since this package pulls in
@@ -249,6 +249,23 @@ Header and RPM macros for building modules against this Redis.
 
 %prep
 %autosetup -n redis-%{version} -p1
+
+# `make modules-update` rewrites redis.conf with an auto-managed block of
+# loadmodule lines pointing into the development tree
+# (./modules/<name>/<lib>.so), and `make tarball` captures the rewritten file.
+# Those relative paths do not exist once installed, and Redis *aborts at
+# startup* when a loadmodule target is missing -- so a plain server could not
+# start at all. Strip the block; modules are enabled instead by the drop-ins
+# the redis package installs into %%{redis_modules_cfg}, which the patched
+# redis.conf includes.
+sed -i '/^# >>> BEGIN: loadmodule paths/,/^# <<< END: loadmodule paths/d' redis.conf
+# Fail loudly if upstream renames the markers rather than shipping a config
+# that aborts on first start.
+if grep -q '^loadmodule' redis.conf; then
+    echo "ERROR: redis.conf still contains loadmodule lines after stripping:"
+    grep -n '^loadmodule' redis.conf
+    exit 1
+fi
 
 # Hoist bundled licence texts to the top level so %%license can reference them.
 mv deps/jemalloc/COPYING          COPYING-jemalloc
@@ -508,7 +525,10 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 %dir %{_libdir}/%{name}
 %dir %{redis_modules_dir}
 %dir %attr(0750, redis, redis) %{_sharedstatedir}/%{name}
-%dir %attr(0750, root, redis) %{_localstatedir}/log/%{name}
+# Owned by redis, not root: the daemon runs as redis and has to create
+# redis-server.log here. With root:redis 0750 the group has no write bit
+# and startup fails with "Can't open the log file: Permission denied".
+%dir %attr(0750, redis, redis) %{_localstatedir}/log/%{name}
 
 %files devel
 %{_includedir}/redismodule.h
@@ -517,6 +537,17 @@ install -pm 0644 modules/redisearch/src/LICENSE.txt LICENSE-redisearch.txt
 
 
 %changelog
+* Mon Aug 31 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-10
+- Strip the development-tree loadmodule block that `make modules-update`
+  writes into redis.conf and `make tarball` captures. Its relative paths
+  (./modules/<name>/<lib>.so) do not exist once installed, and Redis aborts
+  when a loadmodule target is missing, so redis-server could not start at all.
+  A guard now fails the build if the markers change rather than shipping a
+  config that aborts on first start.
+- Own %%{_localstatedir}/log/redis as redis:redis. The daemon runs as redis and
+  creates redis-server.log there; root:redis 0750 left the group without a
+  write bit, so startup failed with "Can't open the log file".
+
 * Fri Aug 28 2026 Angel Yanev <angel.yanev@redis.com> - 8.10.1-9
 - Keep %%description lines inside 80 columns; the version macros pushed two of
   them over once expanded, which only shows on the built RPM
